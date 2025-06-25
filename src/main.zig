@@ -2,6 +2,12 @@ const std = @import("std");
 const linux = std.os.linux;
 const ETH_P_ALL = 0x0003;
 
+// Packet types
+const arp = @import("arp.zig");
+const ipv4 = @import("ipv4.zig");
+
+const logging = @import("logging.zig");
+
 // Command to build this: sudo env "PATH=$PATH" zig run src/main.zig
 
 const EthernetHeader = struct {
@@ -11,6 +17,11 @@ const EthernetHeader = struct {
 };
 
 pub fn main() !void {
+    if (logging.createFiles()) |_| {
+        std.debug.print("Files created successfully\n", .{});
+    } else |_| {
+        std.debug.print("Failed to create the files.\n", .{});
+    }
 
     // This is the socket. It's a syscall.
     //The domain is the kind of thing the socket catches: Could be AF_UNIX, AF_INET, AF_INET6, AF_PACKET, etc...
@@ -76,9 +87,9 @@ pub fn main() !void {
         defer allocator.free(buffer_copy);
 
         if (n > 0) {
-            std.debug.print("Received {} bytes\n", .{n});
+            //std.debug.print("Received {} bytes\n", .{n});
             //std.debug.print("Printing the bytes: {x}\n", .{buf[0..n]});
-            std.debug.print("Raw Ethernet Header: {x}\n", .{buffer_copy[0..14]});
+            //std.debug.print("Raw Ethernet Header: {x}\n", .{buffer_copy[0..14]});
 
             parseEthernet(buffer_copy[0..n]);
         } else {
@@ -94,15 +105,15 @@ fn parseEthernet(pk: []u8) void {
     const ethertype = std.mem.readInt(u16, pk[12..14], .big);
     const myPack = EthernetHeader{ .dst_mac = pk[0..6].*, .src_mac = pk[6..12].*, .ethertype = ethertype };
 
-    std.debug.print("My Pack: {x}, {x}, {x}\n", .{ myPack.src_mac, myPack.dst_mac, myPack.ethertype });
+    //std.debug.print("My Pack: {x}, {x}, {x}\n", .{ myPack.src_mac, myPack.dst_mac, myPack.ethertype });
 
     // Printing the result.
-    std.debug.print("Destination MAC(Packet Struct):", .{});
-    printMACAddress(myPack.dst_mac);
-    std.debug.print("Source MAC(Packet Struct): ", .{});
-    printMACAddress(myPack.src_mac);
-    std.debug.print("Ethernet Type(Packet Struct): ", .{});
-    printEthernetType(myPack.ethertype);
+    //std.debug.print("Destination MAC(Packet Struct):", .{});
+    //printMACAddress(myPack.dst_mac);
+    //std.debug.print("Source MAC(Packet Struct): ", .{});
+    //printMACAddress(myPack.src_mac);
+    //std.debug.print("Ethernet Type(Packet Struct): ", .{});
+    //printEthernetType(myPack.ethertype);
 
     handlePacket(myPack.ethertype, pk[14..]);
 }
@@ -123,145 +134,11 @@ fn printEthernetType(raw: u16) void {
 }
 
 fn handlePacket(pType: u16, packet: []u8) void {
-    std.debug.print("HandlePacket - Found EtherType: {d}\n", .{pType});
+    //std.debug.print("HandlePacket - Found EtherType: {d}\n", .{pType});
     switch (pType) {
-        800 => handleInet(packet),
-        2048 => handleInet(packet),
-        2054 => handleARP(packet),
+        800 => ipv4.handleInet(packet),
+        2048 => ipv4.handleInet(packet),
+        2054 => arp.handleARP(packet),
         else => std.debug.print("Packet type currently not supported.\n", .{}),
     }
-}
-
-const IPv4Header = struct {
-    version_ihl: u8,
-    dscp_ecn: u8,
-    total_length: u16,
-    identification: u16,
-    flags_fragment_offset: u16,
-    ttl: u8,
-    protocol: u8,
-    header_checksum: u16,
-    src_ip: [4]u8,
-    dst_ip: [4]u8,
-    // options may follow
-};
-
-fn handleInet(packet: []u8) void {
-    //std.debug.print("Packet: {x:0>2}\n", .{packet});
-    const pk = IPv4Header{
-        .version_ihl = packet[0],
-        .dscp_ecn = packet[1],
-        .total_length = std.mem.readInt(u16, packet[2..4], .big),
-        .identification = std.mem.readInt(u16, packet[4..6], .big),
-        .flags_fragment_offset = std.mem.readInt(u16, packet[6..8], .big),
-        .ttl = packet[8],
-        .protocol = packet[9],
-        .header_checksum = std.mem.readInt(u16, packet[10..12], .big),
-        .src_ip = packet[12..16].*,
-        .dst_ip = packet[16..20].*,
-    };
-
-    // Casting things for the IHL so to determine where the TCP starts:
-
-    const ihl_words: u8 = pk.version_ihl & 0x0F;
-    const ihl_bytes: usize = @as(usize, @intCast(ihl_words)) * 4;
-
-    const protocol_name = switch (pk.protocol) {
-        6 => "TCP",
-        17 => "UDP",
-        else => "Unknown",
-    };
-
-    std.debug.print("Protocol: {s}\n", .{protocol_name});
-    std.debug.print("IHL: {d}\n", .{pk.version_ihl});
-    std.debug.print("Ips - Source: {d}.{d}.{d}.{d}:{d}, Destination: {d}.{d}.{d}.{d}:{d}\n", .{ pk.src_ip[0], pk.src_ip[1], pk.src_ip[2], pk.src_ip[3], getSourcePort(packet[ihl_bytes..]), pk.dst_ip[0], pk.dst_ip[1], pk.dst_ip[2], pk.dst_ip[3], getDestinationPort(packet[ihl_bytes..]) });
-
-    //std.debug.print("IHL bytes: {}\n", .{ihl_bytes});
-
-    //handleTCP(packet[ihl_bytes..]);
-}
-
-const TCPHeader = struct {
-    src_port: u16,
-    dst_port: u16,
-    seq_number: u32,
-    ack_number: u32,
-    data_offset_reserved_flags: u16,
-    window_size: u16,
-    checksum: u16,
-    urgent_pointer: u16,
-};
-
-fn handleTCP(packet: []u8) void {
-    std.debug.print("handleTCP-Received packet: {x:0>2}\n", .{packet});
-
-    const pk = TCPHeader{
-        .src_port = std.mem.readInt(u16, packet[0..2], .big),
-        .dst_port = std.mem.readInt(u16, packet[2..4], .big),
-        .seq_number = std.mem.readInt(u32, packet[4..8], .big),
-        .ack_number = std.mem.readInt(u32, packet[8..12], .big),
-        .data_offset_reserved_flags = std.mem.readInt(u16, packet[12..14], .big),
-        .window_size = std.mem.readInt(u16, packet[14..16], .big),
-        .checksum = std.mem.readInt(u16, packet[16..18], .big),
-        .urgent_pointer = std.mem.readInt(u16, packet[18..20], .big),
-    };
-
-    std.debug.print("Source Port: {d}, Destination Port: {d}\n", .{ pk.src_port, pk.dst_port });
-}
-
-fn getSourcePort(packet: []u8) u16 {
-    const pk = TCPHeader{
-        .src_port = std.mem.readInt(u16, packet[0..2], .big),
-        .dst_port = std.mem.readInt(u16, packet[2..4], .big),
-        .seq_number = std.mem.readInt(u32, packet[4..8], .big),
-        .ack_number = std.mem.readInt(u32, packet[8..12], .big),
-        .data_offset_reserved_flags = std.mem.readInt(u16, packet[12..14], .big),
-        .window_size = std.mem.readInt(u16, packet[14..16], .big),
-        .checksum = std.mem.readInt(u16, packet[16..18], .big),
-        .urgent_pointer = std.mem.readInt(u16, packet[18..20], .big),
-    };
-
-    return pk.src_port;
-}
-
-fn getDestinationPort(packet: []u8) u16 {
-    const pk = TCPHeader{
-        .src_port = std.mem.readInt(u16, packet[0..2], .big),
-        .dst_port = std.mem.readInt(u16, packet[2..4], .big),
-        .seq_number = std.mem.readInt(u32, packet[4..8], .big),
-        .ack_number = std.mem.readInt(u32, packet[8..12], .big),
-        .data_offset_reserved_flags = std.mem.readInt(u16, packet[12..14], .big),
-        .window_size = std.mem.readInt(u16, packet[14..16], .big),
-        .checksum = std.mem.readInt(u16, packet[16..18], .big),
-        .urgent_pointer = std.mem.readInt(u16, packet[18..20], .big),
-    };
-    return pk.dst_port;
-}
-
-const ARPPacket = struct {
-    htype: u16, // Hardware type (1 for Ethernet)
-    ptype: u16, // Protocol type (0x0800 for IPv4)
-    hlen: u8, // Hardware address length (6 for MAC)
-    plen: u8, // Protocol address length (4 for IPv4)
-    oper: u16, // Operation (1 for request, 2 for reply)
-    sha: [6]u8, // Sender hardware address (MAC)
-    spa: [4]u8, // Sender protocol address (IPv4)
-    tha: [6]u8, // Target hardware address (MAC)
-    tpa: [4]u8, // Target protocol address (IPv4)
-};
-
-fn handleARP(packet: []u8) void {
-    const pk = ARPPacket{
-        .htype = std.mem.readInt(u16, packet[0..2], .big),
-        .ptype = std.mem.readInt(u16, packet[2..4], .big),
-        .hlen = packet[4],
-        .plen = packet[5],
-        .oper = std.mem.readInt(u16, packet[6..8], .big),
-        .sha = packet[8..14].*,
-        .spa = packet[14..18].*,
-        .tha = packet[18..24].*,
-        .tpa = packet[24..28].*,
-    };
-
-    std.debug.print("ARP: Hardware type {d}, Protocol Type {d}, Operation {d}, Sender MAC: {x}:{x}:{x}:{x}:{x}:{x}, Target MAC: {x}:{x}:{x}:{x}:{x}:{x}\n", .{ pk.htype, pk.ptype, pk.oper, pk.sha[0], pk.sha[1], pk.sha[2], pk.sha[3], pk.sha[4], pk.sha[5], pk.tha[0], pk.tha[1], pk.tha[2], pk.tha[3], pk.tha[4], pk.tha[5] });
 }
