@@ -15,11 +15,9 @@ const IPv4Header = struct {
     header_checksum: u16,
     src_ip: [4]u8,
     dst_ip: [4]u8,
-    // options may follow
 };
 
 pub fn handleInet(packet: []u8) void {
-    //std.debug.print("Packet: {x:0>2}\n", .{packet});
     const pk = IPv4Header{
         .version_ihl = packet[0],
         .dscp_ecn = packet[1],
@@ -44,21 +42,10 @@ pub fn handleInet(packet: []u8) void {
         else => "Unknown",
     };
 
-    //std.debug.print("Protocol: {s}\n", .{protocol_name});
-    //std.debug.print("IHL: {d}\n", .{pk.version_ihl});
-
     const src_port = tcp.getSourcePort(packet[ihl_bytes..]);
     const dst_port = tcp.getDestinationPort(packet[ihl_bytes..]);
 
     std.debug.print("IPv4 - {s} - Source: {d}.{d}.{d}.{d}:{d}, Destination: {d}.{d}.{d}.{d}:{d}\n", .{ protocol_name, pk.src_ip[0], pk.src_ip[1], pk.src_ip[2], pk.src_ip[3], src_port, pk.dst_ip[0], pk.dst_ip[1], pk.dst_ip[2], pk.dst_ip[3], dst_port });
 
-    if (logging.saveIPv4(protocol_name, pk.src_ip, src_port, pk.dst_ip, dst_port)) |_| {
-        std.debug.print("Successfully saved\n", .{});
-    } else |_| {
-        std.debug.print("Something wrong with saving the ipv4 to file.\n", .{});
-    }
-
-    //std.debug.print("IHL bytes: {}\n", .{ihl_bytes});
-
-    //handleTCP(packet[ihl_bytes..]);
+    if (logging.saveIPv4(protocol_name, pk.src_ip, src_port, pk.dst_ip, dst_port)) |_| {} else |_| {}
 }

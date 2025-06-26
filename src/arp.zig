@@ -33,9 +33,5 @@ pub fn handleARP(packet: []u8) void {
         std.debug.print("ARP Reply: Hardware type {d}, Protocol Type {d}, Operation {d}, Sender MAC: {x}:{x}:{x}:{x}:{x}:{x}, Sender IP: {d}.{d}.{d}.{d}, Target MAC: {x}:{x}:{x}:{x}:{x}:{x}, Target IP: {d}.{d}.{d}.{d}\n", .{ pk.htype, pk.ptype, pk.oper, pk.sha[0], pk.sha[1], pk.sha[2], pk.sha[3], pk.sha[4], pk.sha[5], pk.spa[0], pk.spa[1], pk.spa[2], pk.spa[3], pk.tha[0], pk.tha[1], pk.tha[2], pk.tha[3], pk.tha[4], pk.tha[5], pk.tpa[0], pk.tpa[1], pk.tpa[2], pk.tpa[3] });
     }
 
-    if (logging.saveARP(pk.htype, pk.ptype, pk.oper, pk.sha, pk.spa, pk.tha, pk.tpa)) |_| {
-        std.debug.print("ARP Saved Successfully.\n", .{});
-    } else |_| {
-        std.debug.print("Failed saving the ARP.\n", .{});
-    }
+    if (logging.saveARP(pk.htype, pk.ptype, pk.oper, pk.sha, pk.spa, pk.tha, pk.tpa)) |_| {} else |_| {}
 }

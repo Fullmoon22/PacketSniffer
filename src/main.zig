@@ -13,7 +13,7 @@ const logging = @import("logging.zig");
 const EthernetHeader = struct {
     dst_mac: [6]u8,
     src_mac: [6]u8,
-    ethertype: u16, // Big endian
+    ethertype: u16, // Must be Big endian
 };
 
 pub fn main() !void {
@@ -78,19 +78,13 @@ pub fn main() !void {
         const n = try std.posix.recv(sockfd, &buf, 0);
 
         // Allocate buffer
-        // Create an allocator (page_allocator is the simplest)
         const allocator = std.heap.page_allocator;
-        // Size can be anything. The type depends on what you want to buffer (usually text so u8 is fine)
         const buffer_copy = try allocator.dupe(u8, buf[0..n]);
 
         // Always defer the free after the allocation.
         defer allocator.free(buffer_copy);
 
         if (n > 0) {
-            //std.debug.print("Received {} bytes\n", .{n});
-            //std.debug.print("Printing the bytes: {x}\n", .{buf[0..n]});
-            //std.debug.print("Raw Ethernet Header: {x}\n", .{buffer_copy[0..14]});
-
             parseEthernet(buffer_copy[0..n]);
         } else {
             std.debug.print("Could not receive a message from the socket.\n", .{});
@@ -104,16 +98,6 @@ fn parseEthernet(pk: []u8) void {
 
     const ethertype = std.mem.readInt(u16, pk[12..14], .big);
     const myPack = EthernetHeader{ .dst_mac = pk[0..6].*, .src_mac = pk[6..12].*, .ethertype = ethertype };
-
-    //std.debug.print("My Pack: {x}, {x}, {x}\n", .{ myPack.src_mac, myPack.dst_mac, myPack.ethertype });
-
-    // Printing the result.
-    //std.debug.print("Destination MAC(Packet Struct):", .{});
-    //printMACAddress(myPack.dst_mac);
-    //std.debug.print("Source MAC(Packet Struct): ", .{});
-    //printMACAddress(myPack.src_mac);
-    //std.debug.print("Ethernet Type(Packet Struct): ", .{});
-    //printEthernetType(myPack.ethertype);
 
     handlePacket(myPack.ethertype, pk[14..]);
 }
@@ -134,7 +118,6 @@ fn printEthernetType(raw: u16) void {
 }
 
 fn handlePacket(pType: u16, packet: []u8) void {
-    //std.debug.print("HandlePacket - Found EtherType: {d}\n", .{pType});
     switch (pType) {
         800 => ipv4.handleInet(packet),
         2048 => ipv4.handleInet(packet),

@@ -12,8 +12,6 @@ const TCPHeader = struct {
 };
 
 pub fn handleTCP(packet: []u8) void {
-    //std.debug.print("handleTCP-Received packet: {x:0>2}\n", .{packet});
-
     if (packet.len < 20) {
         return 0;
     }

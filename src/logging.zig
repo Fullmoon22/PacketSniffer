@@ -18,12 +18,10 @@ pub fn saveIPv4(protocol: []const u8, src_ip: [4]u8, src_port: u16, dst_ip: [4]u
     if (std.fmt.allocPrint(allocator, "IPv4 - {s} - Source: {d}.{d}.{d}.{d}:{d}, Destination: {d}.{d}.{d}.{d}:{d}\n", .{ protocol, src_ip[0], src_ip[1], src_ip[2], src_ip[3], src_port, dst_ip[0], dst_ip[1], dst_ip[2], dst_ip[3], dst_port })) |string| {
         defer allocator.free(string);
         const folder = std.fs.cwd();
-        //defer folder.close();
         if (folder.openFile("IPv4.txt", .{ .mode = .read_write })) |file| {
             defer file.close();
             const end_pos = try file.getEndPos();
             _ = try file.pwrite(string, end_pos);
-            //try file.setEndPos(end_pos + written);
         } else |_| {
             return;
         }
@@ -60,12 +58,10 @@ pub fn saveARP(hardware: u16, protocol: u16, operation: u16, sender_MAC: [6]u8, 
     })) |string| {
         defer allocator.free(string);
         const folder = std.fs.cwd();
-        //defer folder.close();
         if (folder.openFile("ARP.txt", .{ .mode = .read_write })) |file| {
             defer file.close();
             const end_pos = try file.getEndPos();
             _ = try file.pwrite(string, end_pos);
-            //try file.setEndPos(end_pos + written);
         } else |_| {
             return;
         }
